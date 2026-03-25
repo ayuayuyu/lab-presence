@@ -14,5 +14,3 @@ frontend/out/
 # OS
 .DS_Store
 
-deploy.sh
-setup-*.sh
