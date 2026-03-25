@@ -36,12 +36,20 @@ func main() {
 	// WebSocket（認証不要）
 	mux.HandleFunc("/ws/presence", hub.HandleWS())
 
-	// 認証必要
+	// 認証ユーザー同期・表示名変更
+	mux.HandleFunc("/api/auth/me", handler.Auth(handler.HandleAuthMe(conn)))
+	mux.HandleFunc("/api/users/me", handler.Auth(handler.HandleUserMe(conn)))
+
+	// 認証必要（読み取り専用）
 	mux.HandleFunc("/api/presence/last-seen", handler.Auth(handler.HandleLastSeen(conn)))
 	mux.HandleFunc("/api/presence", handler.Auth(handler.HandlePresence(conn)))
-	mux.HandleFunc("/api/users", handler.Auth(handler.HandleUsers(conn)))
+
+	// GETは認証のみ、書き込み(POST/PUT/DELETE)は管理者権限が必要
+	mux.HandleFunc("/api/users", handler.AuthWithAdminWrite(handler.HandleUsers(conn)))
+	// デバイス一覧・登録: GET/POSTは認証ユーザー（POSTは自分のデバイスのみ）
 	mux.HandleFunc("/api/devices", handler.Auth(handler.HandleDevices(conn)))
-	mux.HandleFunc("/api/devices/", handler.Auth(handler.HandleDevice(conn)))
+	// デバイス編集・削除: 管理者のみ
+	mux.HandleFunc("/api/devices/", handler.AdminAuth(handler.HandleDevice(conn)))
 
 	// ヘルスチェック
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

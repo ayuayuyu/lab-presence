@@ -9,9 +9,11 @@ import {
   getUsers,
   updateDevice,
 } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import { Device, User } from "@/lib/types";
 
 export default function RegisterPage() {
+  const { user, isAdmin } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [message, setMessage] = useState({ text: "", isError: false });
@@ -29,6 +31,10 @@ export default function RegisterPage() {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // 全ユーザー共通で自分のデバイスのみ表示
+  const myUserId = user?.id ?? 0;
+  const visibleDevices = devices.filter((d) => d.user_id === myUserId);
 
   return (
     <div className="space-y-8">
@@ -49,15 +55,17 @@ export default function RegisterPage() {
       )}
 
       <div className="grid gap-8 md:grid-cols-2">
-        <UserForm
-          onCreated={(msg) => {
-            setMessage({ text: msg, isError: false });
-            refresh();
-          }}
-          onError={(msg) => setMessage({ text: msg, isError: true })}
-        />
+        {isAdmin && (
+          <UserForm
+            onCreated={(msg) => {
+              setMessage({ text: msg, isError: false });
+              refresh();
+            }}
+            onError={(msg) => setMessage({ text: msg, isError: true })}
+          />
+        )}
         <DeviceForm
-          users={users}
+          myName={user?.name ?? ""}
           onCreated={(msg) => {
             setMessage({ text: msg, isError: false });
             refresh();
@@ -67,8 +75,8 @@ export default function RegisterPage() {
       </div>
 
       <RegisteredDevices
-        users={users}
-        devices={devices}
+        devices={visibleDevices}
+        isAdmin={isAdmin}
         onUpdated={(msg) => {
           setMessage({ text: msg, isError: false });
           refresh();
@@ -152,25 +160,24 @@ function UserForm({
 }
 
 function DeviceForm({
-  users,
+  myName,
   onCreated,
   onError,
 }: {
-  users: User[];
+  myName: string;
   onCreated: (msg: string) => void;
   onError: (msg: string) => void;
 }) {
-  const [userId, setUserId] = useState("");
   const [mac, setMac] = useState("");
   const [label, setLabel] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!userId || !mac.trim()) return;
+    if (!mac.trim()) return;
     setSubmitting(true);
     try {
-      await createDevice(Number(userId), mac.trim(), label.trim());
+      await createDevice(mac.trim(), label.trim());
       onCreated(`デバイス「${mac.trim()}」を登録しました`);
       setMac("");
       setLabel("");
@@ -193,21 +200,11 @@ function DeviceForm({
       <h2 className="text-lg font-semibold">デバイス登録</h2>
       <div>
         <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>
-          ユーザー *
+          ユーザー
         </label>
-        <select
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          required
-          className="w-full rounded-lg border px-3 py-2 text-sm bg-transparent border-[var(--card-border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-        >
-          <option value="">選択してください</option>
-          {users.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name} {u.student_id && `(${u.student_id})`}
-            </option>
-          ))}
-        </select>
+        <p className="text-sm font-medium px-3 py-2 rounded-lg border border-[var(--card-border)]">
+          {myName}
+        </p>
       </div>
       <div>
         <label className="block text-sm mb-1" style={{ color: "var(--muted)" }}>
@@ -235,7 +232,7 @@ function DeviceForm({
       </div>
       <button
         type="submit"
-        disabled={submitting || users.length === 0}
+        disabled={submitting}
         className="w-full rounded-lg py-2 text-sm font-medium text-white transition-colors disabled:opacity-50"
         style={{ backgroundColor: "var(--accent)" }}
       >
@@ -246,42 +243,38 @@ function DeviceForm({
 }
 
 function RegisteredDevices({
-  users,
   devices,
+  isAdmin,
   onUpdated,
   onError,
 }: {
-  users: User[];
   devices: Device[];
+  isAdmin: boolean;
   onUpdated: (msg: string) => void;
   onError: (msg: string) => void;
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editMac, setEditMac] = useState("");
   const [editLabel, setEditLabel] = useState("");
-  const [editUserId, setEditUserId] = useState("");
   const [saving, setSaving] = useState(false);
 
   if (devices.length === 0) return null;
-
-  const userMap = new Map(users.map((u) => [u.id, u]));
 
   const startEdit = (d: Device) => {
     setEditingId(d.id);
     setEditMac(d.mac_address);
     setEditLabel(d.label);
-    setEditUserId(String(d.user_id));
   };
 
   const cancelEdit = () => {
     setEditingId(null);
   };
 
-  const saveEdit = async (id: number) => {
-    if (!editMac.trim() || !editUserId) return;
+  const saveEdit = async (d: Device) => {
+    if (!editMac.trim()) return;
     setSaving(true);
     try {
-      await updateDevice(id, Number(editUserId), editMac.trim(), editLabel.trim());
+      await updateDevice(d.id, d.user_id, editMac.trim(), editLabel.trim());
       setEditingId(null);
       onUpdated("デバイスを更新しました");
     } catch (e) {
@@ -303,7 +296,7 @@ function RegisteredDevices({
 
   return (
     <div>
-      <h2 className="text-lg font-semibold mb-3">登録済みデバイス</h2>
+      <h2 className="text-lg font-semibold mb-3">あなたのデバイス</h2>
       <div className="overflow-x-auto">
         <div
           className="rounded-xl border overflow-hidden card-shadow-static"
@@ -315,10 +308,9 @@ function RegisteredDevices({
                 className="text-left"
                 style={{ backgroundColor: "var(--accent-light)" }}
               >
-                <th className="px-4 py-3 font-semibold">ユーザー</th>
                 <th className="px-4 py-3 font-semibold">MACアドレス</th>
                 <th className="px-4 py-3 font-semibold">ラベル</th>
-                <th className="px-4 py-3 font-semibold">操作</th>
+                {isAdmin && <th className="px-4 py-3 font-semibold">操作</th>}
               </tr>
             </thead>
             <tbody>
@@ -329,24 +321,10 @@ function RegisteredDevices({
                   style={{
                     backgroundColor:
                       index % 2 === 1 ? "var(--accent-light)" : "var(--card-bg)",
-                    opacity: index % 2 === 1 ? 0.8 : undefined,
                   }}
                 >
-                {editingId === d.id ? (
+                {editingId === d.id && isAdmin ? (
                   <>
-                    <td className="px-4 py-2">
-                      <select
-                        value={editUserId}
-                        onChange={(e) => setEditUserId(e.target.value)}
-                        className="w-full rounded-lg border px-2 py-1 text-sm bg-transparent border-[var(--card-border)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                      >
-                        {users.map((u) => (
-                          <option key={u.id} value={u.id}>
-                            {u.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
                     <td className="px-4 py-2">
                       <input
                         type="text"
@@ -366,7 +344,7 @@ function RegisteredDevices({
                     <td className="px-4 py-2">
                       <div className="flex gap-1">
                         <button
-                          onClick={() => saveEdit(d.id)}
+                          onClick={() => saveEdit(d)}
                           disabled={saving}
                           className="rounded-lg px-2.5 py-1 text-xs font-medium text-white transition-colors disabled:opacity-50"
                           style={{ backgroundColor: "var(--accent)" }}
@@ -385,33 +363,32 @@ function RegisteredDevices({
                   </>
                 ) : (
                   <>
-                    <td className="px-4 py-3">
-                      {userMap.get(d.user_id)?.name ?? `ID:${d.user_id}`}
-                    </td>
                     <td className="px-4 py-3 font-mono">{d.mac_address}</td>
                     <td className="px-4 py-3" style={{ color: d.label ? undefined : "var(--muted)" }}>
                       {d.label || "-"}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-1">
-                        <button
-                          onClick={() => startEdit(d)}
-                          className="rounded-lg px-2.5 py-1 text-xs font-medium transition-colors border border-[var(--card-border)] hover:bg-[var(--card-bg)]"
-                        >
-                          編集
-                        </button>
-                        <button
-                          onClick={() => handleDelete(d)}
-                          className="rounded-lg px-2.5 py-1 text-xs font-medium transition-colors border"
-                          style={{
-                            color: "var(--danger)",
-                            borderColor: "var(--danger)",
-                          }}
-                        >
-                          削除
-                        </button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => startEdit(d)}
+                            className="rounded-lg px-2.5 py-1 text-xs font-medium transition-colors border border-[var(--card-border)] hover:bg-[var(--card-bg)]"
+                          >
+                            編集
+                          </button>
+                          <button
+                            onClick={() => handleDelete(d)}
+                            className="rounded-lg px-2.5 py-1 text-xs font-medium transition-colors border"
+                            style={{
+                              color: "var(--danger)",
+                              borderColor: "var(--danger)",
+                            }}
+                          >
+                            削除
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </>
                 )}
               </tr>

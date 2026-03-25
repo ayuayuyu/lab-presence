@@ -62,16 +62,15 @@ export function getDevices(): Promise<Device[]> {
   return fetcher("/api/devices");
 }
 
-// デバイス登録
+// デバイス登録（JWTから自動的にユーザーを解決）
 export function createDevice(
-  userId: number,
   macAddress: string,
   label: string
 ): Promise<Device> {
   return fetcher("/api/devices", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, mac_address: macAddress, label }),
+    body: JSON.stringify({ mac_address: macAddress, label }),
   });
 }
 
@@ -92,4 +91,22 @@ export function updateDevice(
 // デバイス削除
 export function deleteDevice(id: number): Promise<void> {
   return fetcher(`/api/devices/${id}`, { method: "DELETE" });
+}
+
+// 認証ユーザー同期（ログイン時にDBユーザーを upsert）
+export function syncAuthMe(name: string, picture: string): Promise<User> {
+  return fetcher("/api/auth/me", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, picture }),
+  });
+}
+
+// 表示名変更
+export function updateMyName(name: string): Promise<User> {
+  return fetcher("/api/users/me", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
 }

@@ -6,6 +6,8 @@ BEGIN;
 CREATE TABLE users (
     id          SERIAL PRIMARY KEY,
     name        TEXT NOT NULL,
+    email       TEXT UNIQUE,
+    picture     TEXT NOT NULL DEFAULT '',
     student_id  TEXT UNIQUE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -32,11 +34,18 @@ CREATE TABLE presence_logs (
 CREATE INDEX idx_presence_device ON presence_logs (device_id);
 CREATE INDEX idx_presence_detected ON presence_logs (detected_at DESC);
 
+-- ユーザーごとの最終検知日時（scanごとにUPSERTで更新）
+CREATE TABLE user_last_seen (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    detected_at TIMESTAMPTZ NOT NULL
+);
+
 -- 最新の在室状態を高速取得するためのビュー
 CREATE VIEW current_presence AS
 SELECT DISTINCT ON (d.user_id)
     u.id   AS user_id,
     u.name AS user_name,
+    u.picture AS user_picture,
     d.mac_address,
     d.label AS device_label,
     pl.detected_at

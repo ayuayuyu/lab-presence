@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/ayuayuyu/lab-presence/backend/internal/model"
 	"github.com/gorilla/websocket"
@@ -101,6 +102,7 @@ func (h *Hub) BroadcastPresence(db *sql.DB) {
 	defer h.mu.Unlock()
 
 	for conn := range h.clients {
+		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 			log.Printf("ws write error: %v", err)
 			conn.Close()
@@ -110,7 +112,7 @@ func (h *Hub) BroadcastPresence(db *sql.DB) {
 }
 
 func queryPresence(db *sql.DB) ([]model.Presence, error) {
-	const query = `SELECT user_id, user_name, mac_address, device_label, detected_at FROM current_presence`
+	const query = `SELECT user_id, user_name, user_picture, mac_address, device_label, detected_at FROM current_presence`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -120,7 +122,7 @@ func queryPresence(db *sql.DB) ([]model.Presence, error) {
 	var list []model.Presence
 	for rows.Next() {
 		var p model.Presence
-		if err := rows.Scan(&p.UserID, &p.UserName, &p.MACAddress, &p.DeviceLabel, &p.DetectedAt); err != nil {
+		if err := rows.Scan(&p.UserID, &p.UserName, &p.UserPicture, &p.MACAddress, &p.DeviceLabel, &p.DetectedAt); err != nil {
 			return nil, err
 		}
 		list = append(list, p)
@@ -133,12 +135,10 @@ func queryPresence(db *sql.DB) ([]model.Presence, error) {
 
 func queryLastSeen(db *sql.DB) ([]model.LastSeen, error) {
 	const query = `
-		SELECT DISTINCT ON (u.id)
-			u.id, u.name, pl.detected_at
-		FROM presence_logs pl
-		JOIN devices d ON d.id = pl.device_id
-		JOIN users u ON u.id = d.user_id
-		ORDER BY u.id, pl.detected_at DESC`
+		SELECT u.id, u.name, u.picture, ls.detected_at
+		FROM user_last_seen ls
+		JOIN users u ON u.id = ls.user_id
+		ORDER BY ls.detected_at DESC`
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -148,7 +148,7 @@ func queryLastSeen(db *sql.DB) ([]model.LastSeen, error) {
 	var list []model.LastSeen
 	for rows.Next() {
 		var ls model.LastSeen
-		if err := rows.Scan(&ls.UserID, &ls.UserName, &ls.LastSeenAt); err != nil {
+		if err := rows.Scan(&ls.UserID, &ls.UserName, &ls.UserPicture, &ls.LastSeenAt); err != nil {
 			return nil, err
 		}
 		list = append(list, ls)

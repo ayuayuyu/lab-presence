@@ -251,10 +251,24 @@ function LastSeenSection({
                     borderColor: "var(--card-border)",
                     backgroundColor:
                       index % 2 === 1 ? "var(--accent-light)" : undefined,
-                    opacity: index % 2 === 1 ? 0.6 : undefined,
                   }}
                 >
                   <td className="px-4 py-3 flex items-center gap-2">
+                    {ls.user_picture ? (
+                      <img
+                        src={ls.user_picture}
+                        alt={ls.user_name}
+                        className="w-6 h-6 rounded-full shrink-0"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0"
+                        style={{ backgroundColor: "var(--accent)" }}
+                      >
+                        {ls.user_name.charAt(0)}
+                      </div>
+                    )}
                     {ls.user_name}
                     {isPresent && (
                       <span
@@ -272,7 +286,7 @@ function LastSeenSection({
                     className="px-4 py-3"
                     style={{ color: "var(--muted)" }}
                   >
-                    {date.getMonth() + 1}月{date.getDate()}日
+                    {date.getMonth() + 1}月{date.getDate()}日 {date.getHours()}:{String(date.getMinutes()).padStart(2, '0')}
                     <span className="ml-2 text-xs">({daysAgo})</span>
                   </td>
                 </tr>
@@ -297,12 +311,21 @@ function MemberCard({ member }: { member: Presence }) {
         borderColor: "var(--card-border)",
       }}
     >
-      <div
-        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base shrink-0"
-        style={{ backgroundColor: "var(--success)" }}
-      >
-        {member.user_name.charAt(0)}
-      </div>
+      {member.user_picture ? (
+        <img
+          src={member.user_picture}
+          alt={member.user_name}
+          className="w-12 h-12 rounded-full shrink-0 object-cover"
+          referrerPolicy="no-referrer"
+        />
+      ) : (
+        <div
+          className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-base shrink-0"
+          style={{ backgroundColor: "var(--success)" }}
+        >
+          {member.user_name.charAt(0)}
+        </div>
+      )}
       <div className="min-w-0">
         <p className="font-semibold text-base truncate">{member.user_name}</p>
         <p className="text-sm truncate" style={{ color: "var(--muted)" }}>

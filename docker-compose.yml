@@ -25,6 +25,7 @@ services:
       DATABASE_URL: postgres://lab:lab-secret@db:5432/lab_presence?sslmode=disable
       PORT: "8080"
       ALLOWED_DOMAIN: pluslab.org
+      ADMIN_EMAILS: ${ADMIN_EMAILS}
     depends_on:
       db:
         condition: service_healthy
@@ -35,6 +36,7 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
+        NEXT_PUBLIC_ADMIN_EMAILS: ${NEXT_PUBLIC_ADMIN_EMAILS}
     restart: unless-stopped
     ports:
       - "80:80"

@@ -4,11 +4,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/ayuayuyu/lab-presence/backend/internal/model"
 )
+
+var macAddrRe = regexp.MustCompile(`^([0-9a-f]{2}:){5}[0-9a-f]{2}$`)
 
 // GET  /api/devices — デバイス一覧
 // POST /api/devices — デバイス登録
@@ -56,14 +59,28 @@ func createDevice(db *sql.DB, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 常にJWTのemailからuser_idを解決（自分のデバイスのみ登録可能）
+	email := extractEmail(r)
+	var userID int
+	err := db.QueryRow(`SELECT id FROM users WHERE email = $1`, email).Scan(&userID)
+	if err != nil {
+		http.Error(w, "user not found for this email", http.StatusBadRequest)
+		return
+	}
+	req.UserID = userID
+
 	req.MACAddress = strings.TrimSpace(strings.ToLower(req.MACAddress))
-	if req.MACAddress == "" || req.UserID == 0 {
-		http.Error(w, "user_id and mac_address are required", http.StatusBadRequest)
+	if req.MACAddress == "" {
+		http.Error(w, "mac_address is required", http.StatusBadRequest)
+		return
+	}
+	if !macAddrRe.MatchString(req.MACAddress) {
+		http.Error(w, "invalid mac_address format (expected aa:bb:cc:dd:ee:ff)", http.StatusBadRequest)
 		return
 	}
 
 	var d model.Device
-	err := db.QueryRow(
+	err = db.QueryRow(
 		`INSERT INTO devices (user_id, mac_address, label) VALUES ($1, $2::macaddr, $3)
 		 RETURNING id, user_id, mac_address::text, label, created_at`,
 		req.UserID, req.MACAddress, req.Label,
@@ -116,6 +133,10 @@ func updateDevice(db *sql.DB, w http.ResponseWriter, r *http.Request, id int) {
 	req.MACAddress = strings.TrimSpace(strings.ToLower(req.MACAddress))
 	if req.MACAddress == "" || req.UserID == 0 {
 		http.Error(w, "user_id and mac_address are required", http.StatusBadRequest)
+		return
+	}
+	if !macAddrRe.MatchString(req.MACAddress) {
+		http.Error(w, "invalid mac_address format (expected aa:bb:cc:dd:ee:ff)", http.StatusBadRequest)
 		return
 	}
 
