@@ -21,12 +21,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Check .env exists
+      - name: Restore .env from persistent location
         run: |
-          if [ ! -f .env ]; then
-            echo "::error::.env file not found on the runner. Please create it on the Raspberry Pi."
+          ENV_SOURCE="${HOME}/.lab-presence.env"
+          if [ ! -f "${ENV_SOURCE}" ]; then
+            echo "::error::${ENV_SOURCE} が見つかりません。ラズパイで以下を実行してください:"
+            echo "::error::  cp ~/lab-presence/.env ~/.lab-presence.env"
             exit 1
           fi
+          cp "${ENV_SOURCE}" .env
 
       - name: Build and restart services
         run: |
