@@ -12,7 +12,10 @@ set -euo pipefail
 
 REPO="${1:?Usage: $0 <owner/repo> <runner-token>}"
 TOKEN="${2:?Usage: $0 <owner/repo> <runner-token>}"
+# バージョンとハッシュは GitHub Settings → Actions → Runners → New runner (Linux/ARM64) で確認
 RUNNER_VERSION="2.333.0"
+RUNNER_HASH_ARM64="b5697062a13f63b44f869de9369638a7039677b9e0f87e47a6001a758c0d09bf"
+RUNNER_HASH_X64="5e05f9c6c2de8fa6e4da0b9e7e75b3e78be72929b46c3b5c28df29c2ca7e6e24"
 RUNNER_DIR="${HOME}/actions-runner"
 
 echo "==> GitHub Actions Runner セットアップ開始"
@@ -26,9 +29,8 @@ cd "${RUNNER_DIR}"
 
 ARCH=$(uname -m)
 case "${ARCH}" in
-  aarch64) RUNNER_ARCH="arm64" ;;
-  armv7l)  RUNNER_ARCH="arm"   ;;
-  x86_64)  RUNNER_ARCH="x64"   ;;
+  aarch64) RUNNER_ARCH="arm64"; RUNNER_HASH="${RUNNER_HASH_ARM64}" ;;
+  x86_64)  RUNNER_ARCH="x64";   RUNNER_HASH="${RUNNER_HASH_X64}"   ;;
   *) echo "Unsupported arch: ${ARCH}"; exit 1 ;;
 esac
 
@@ -39,12 +41,8 @@ if [ ! -f "${RUNNER_DIR}/config.sh" ]; then
   echo "==> ランナーをダウンロード中... (${RUNNER_ARCH})"
   curl -fsSL -o "${RUNNER_PKG}" "${RUNNER_URL}"
 
-  # ハッシュファイルをダウンロードして検証
-  HASH_FILE="${RUNNER_PKG}.sha256"
-  curl -fsSL -o "${HASH_FILE}" "${RUNNER_URL}.sha256"
   echo "==> ハッシュを検証中..."
-  sha256sum -c "${HASH_FILE}"
-  rm -f "${HASH_FILE}"
+  echo "${RUNNER_HASH}  ${RUNNER_PKG}" | sha256sum -c -
 
   tar xzf "${RUNNER_PKG}"
   rm -f "${RUNNER_PKG}"
