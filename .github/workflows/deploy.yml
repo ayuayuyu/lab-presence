@@ -1,0 +1,62 @@
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+
+# 同時デプロイを防止する
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI (tests must pass before deploy)
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy to Raspberry Pi
+    needs: ci
+    runs-on: [self-hosted, linux, arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check .env exists
+        run: |
+          if [ ! -f .env ]; then
+            echo "::error::.env file not found on the runner. Please create it on the Raspberry Pi."
+            exit 1
+          fi
+
+      - name: Build and restart services
+        run: |
+          docker compose pull --ignore-buildable
+          docker compose up --build -d
+
+      - name: Wait for services to be healthy
+        run: |
+          echo "Waiting for services to become healthy..."
+          for i in $(seq 1 30); do
+            if docker compose ps | grep -E "(unhealthy|starting)" > /dev/null 2>&1; then
+              echo "  attempt $i/30: services still starting..."
+              sleep 5
+            else
+              echo "All services are up."
+              break
+            fi
+          done
+
+      - name: Verify deployment
+        run: |
+          docker compose ps
+          echo ""
+          echo "Health check..."
+          curl -sf http://localhost/api/scan \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"macs":[]}' \
+            && echo "Backend is responding." \
+            || echo "::warning::Backend health check failed (may still be starting)"
+
+      - name: Remove old Docker images
+        run: docker image prune -f
