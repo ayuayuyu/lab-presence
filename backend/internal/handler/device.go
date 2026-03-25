@@ -19,7 +19,7 @@ func HandleDevices(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			listDevices(db, w)
+			listDevices(db, w, r)
 		case http.MethodPost:
 			createDevice(db, w, r)
 		default:
@@ -28,8 +28,21 @@ func HandleDevices(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-func listDevices(db *sql.DB, w http.ResponseWriter) {
-	rows, err := db.Query(`SELECT id, user_id, mac_address::text, label, created_at FROM devices ORDER BY id`)
+func listDevices(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+	email := extractEmail(r)
+
+	var rows *sql.Rows
+	var err error
+	if isAdminEmail(email) {
+		rows, err = db.Query(`SELECT id, user_id, mac_address::text, label, created_at FROM devices ORDER BY id`)
+	} else {
+		rows, err = db.Query(`
+			SELECT d.id, d.user_id, d.mac_address::text, d.label, d.created_at
+			FROM devices d
+			JOIN users u ON d.user_id = u.id
+			WHERE u.email = $1
+			ORDER BY d.id`, email)
+	}
 	if err != nil {
 		http.Error(w, "query failed", http.StatusInternalServerError)
 		return

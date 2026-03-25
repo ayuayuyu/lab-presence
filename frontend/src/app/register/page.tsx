@@ -31,10 +31,6 @@ export default function RegisterPage() {
     refresh();
   }, [refresh]);
 
-  // 全ユーザー共通で自分のデバイスのみ表示
-  const myUserId = user?.id ?? 0;
-  const visibleDevices = devices.filter((d) => d.user_id === myUserId);
-
   return (
     <div className="space-y-8">
       <h1 className="text-3xl font-bold">デバイス登録</h1>
@@ -74,7 +70,7 @@ export default function RegisterPage() {
       </div>
 
       <RegisteredDevices
-        devices={visibleDevices}
+        devices={devices}
         isAdmin={isAdmin}
         onUpdated={(msg) => {
           setMessage({ text: msg, isError: false });

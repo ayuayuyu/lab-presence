@@ -35,6 +35,16 @@ func parseIDToken(token string) (*idTokenPayload, error) {
 	return &claims, nil
 }
 
+// isAdminEmail は指定のメールアドレスが ADMIN_EMAILS に含まれるかを返す
+func isAdminEmail(email string) bool {
+	for _, e := range strings.Split(os.Getenv("ADMIN_EMAILS"), ",") {
+		if strings.TrimSpace(e) == email {
+			return true
+		}
+	}
+	return false
+}
+
 // extractEmail は Authorization ヘッダーの JWT からメールアドレスを取得する
 func extractEmail(r *http.Request) string {
 	authHeader := r.Header.Get("Authorization")
