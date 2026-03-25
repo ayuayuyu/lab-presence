@@ -6,22 +6,19 @@ import {
   createUser,
   deleteDevice,
   getDevices,
-  getUsers,
   updateDevice,
 } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Device, User } from "@/lib/types";
+import { Device } from "@/lib/types";
 
 export default function RegisterPage() {
   const { user, isAdmin } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
   const [devices, setDevices] = useState<Device[]>([]);
   const [message, setMessage] = useState({ text: "", isError: false });
 
   const refresh = useCallback(async () => {
     try {
-      const [u, d] = await Promise.all([getUsers(), getDevices()]);
-      setUsers(u);
+      const d = await getDevices();
       setDevices(d);
     } catch {
       setMessage({ text: "データの取得に失敗しました", isError: true });
@@ -29,6 +26,8 @@ export default function RegisterPage() {
   }, []);
 
   useEffect(() => {
+    // refresh は async なので setState は非同期で呼ばれる（同期的なカスケードではない）
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, [refresh]);
 

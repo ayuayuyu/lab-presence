@@ -102,7 +102,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isOutsider, setIsOutsider] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  // トークンが存在する場合のみ復元処理が走るため、ない場合は最初からfalse
+  const [isLoading, setIsLoading] = useState(() => {
+    const token = getToken();
+    return !!(token && decodeJWTPayload(token));
+  });
 
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
@@ -139,7 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
     }
-    setIsLoading(false);
+    // isLoading はトークンなしの場合 false で初期化されているため setIsLoading 不要
   }, []);
 
   return (
